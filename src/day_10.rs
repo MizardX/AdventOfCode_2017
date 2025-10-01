@@ -1,3 +1,5 @@
+use crate::utils::KnotHasher;
+
 #[aoc(day10, part1)]
 fn part_1(input: &str) -> u16 {
     let lengths = input
@@ -5,85 +7,17 @@ fn part_1(input: &str) -> u16 {
         .map(str::parse)
         .collect::<Result<Vec<_>, _>>()
         .unwrap();
-    let mut hasher = KnotHasher::<256>::new(&lengths);
-    hasher.scramble();
+    let mut hasher = KnotHasher::<256>::with_raw_lengths(&lengths);
+    hasher.scramble_once();
     hasher.small_hash()
 }
 
 #[aoc(day10, part2)]
 fn part_2(input: &str) -> String {
-    let mut lengths = input.bytes().map(usize::from).collect::<Vec<_>>();
-    lengths.extend_from_slice(&[17, 31, 73, 47, 23]);
+    let lengths = input.bytes().collect::<Vec<_>>();
     let mut hasher = KnotHasher::<256>::new(&lengths);
-    for _ in 0..64 {
-        hasher.scramble();
-    }
+    hasher.scramble_full();
     hasher.large_hash()
-}
-
-#[derive(Debug, Clone)]
-struct KnotHasher<'a, const N: usize = 256> {
-    lengths: &'a [usize],
-    state: [u8; N],
-    scratch: [u8; N],
-    pos: usize,
-    skip: usize,
-}
-
-impl<'a, const N: usize> KnotHasher<'a, N> {
-    fn new(lengths: &'a [usize]) -> Self {
-        let mut state = [0; N];
-        for (i, x) in state.iter_mut().enumerate() {
-            *x = u8::try_from(i).unwrap();
-        }
-        Self {
-            lengths,
-            state,
-            scratch: [0; N],
-            pos: 0,
-            skip: 0,
-        }
-    }
-
-    fn scramble(&mut self) {
-        for &len in self.lengths {
-            if self.pos + len > N {
-                let a = self.pos + len - N;
-                let b = N - self.pos;
-                // Copy data to buf to reverse it
-                // state          buf            buf            state
-                // [tuv|..|yz] -> [yz|tuv|..] -> [vu|tzy|..] -> [tzy|..|vu]
-                //    a^  ^pos      b^   ^len      b^   ^len       a^  ^pos
-                self.scratch[..b].copy_from_slice(&self.state[self.pos..]);
-                self.scratch[b..len].copy_from_slice(&self.state[..a]);
-                self.scratch[..len].reverse();
-                self.state[self.pos..].copy_from_slice(&self.scratch[..b]);
-                self.state[..a].copy_from_slice(&self.scratch[b..len]);
-            } else {
-                self.state[self.pos..self.pos + len].reverse();
-            }
-            self.pos = (self.pos + len + self.skip) % N;
-            self.skip += 1;
-        }
-    }
-
-    fn small_hash(&self) -> u16 {
-        u16::from(self.state[0]) * u16::from(self.state[1])
-    }
-
-    fn large_hash(&self) -> String {
-        const HEX: &[u8; 16] = b"0123456789abcdef";
-        let mut res = Vec::with_capacity(N * 2);
-        for i in (0..N).step_by(16) {
-            let mut sum = 0;
-            for &x in &self.state[i..i + 16] {
-                sum ^= x;
-            }
-            res.push(HEX[(sum >> 4) as usize]);
-            res.push(HEX[(sum & 0xF) as usize]);
-        }
-        unsafe { String::from_utf8_unchecked(res) }
-    }
 }
 
 #[cfg(test)]
@@ -94,7 +28,7 @@ mod tests {
     #[test]
     fn test_part_1() {
         let mut hasher = KnotHasher::<5>::new(&[3, 4, 1, 5]);
-        hasher.scramble();
+        hasher.scramble_once();
         let result = hasher.small_hash();
         assert_eq!(result, 12);
     }
