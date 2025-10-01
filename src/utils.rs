@@ -97,3 +97,57 @@ impl<const N: usize> KnotHasher<N> {
         unsafe { String::from_utf8_unchecked(res) }
     }
 }
+
+#[derive(Debug, Clone, Copy)]
+struct UnionFindNode {
+    parent: usize,
+    size: usize,
+}
+
+#[derive(Debug, Clone)]
+pub struct UnionFind {
+    nodes: Vec<UnionFindNode>,
+    num_groups: usize,
+}
+
+impl UnionFind {
+    pub fn new(size: usize) -> Self {
+        let nodes = (0..size)
+            .map(|parent| UnionFindNode { parent, size: 1 })
+            .collect();
+        Self {
+            nodes,
+            num_groups: size,
+        }
+    }
+
+    pub fn find(&mut self, mut index: usize) -> usize {
+        let mut parent = self.nodes[index].parent;
+        while parent != index {
+            let grand_parent = self.nodes[parent].parent;
+            self.nodes[index].parent = grand_parent;
+            index = grand_parent;
+            parent = self.nodes[index].parent;
+        }
+        index
+    }
+
+    pub fn union(&mut self, mut index1: usize, mut index2: usize) -> bool {
+        index1 = self.find(index1);
+        index2 = self.find(index2);
+        if index1 == index2 {
+            return false;
+        }
+        if self.nodes[index1].size > self.nodes[index2].size {
+            (index1, index2) = (index2, index1);
+        }
+        self.nodes[index2].parent = index1;
+        self.nodes[index1].size += self.nodes[index2].size;
+        self.num_groups -= 1;
+        true
+    }
+
+    pub const fn num_groups(&self) -> usize {
+        self.num_groups
+    }
+}

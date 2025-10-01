@@ -2,55 +2,7 @@ use std::num::ParseIntError;
 
 use thiserror::Error;
 
-#[derive(Debug, Clone, Copy)]
-struct UnionFindNode {
-    parent: usize,
-    size: usize,
-}
-
-#[derive(Debug, Clone)]
-struct UnionFind {
-    nodes: Vec<UnionFindNode>,
-    num_groups: usize,
-}
-
-impl UnionFind {
-    fn new(size: usize) -> Self {
-        let nodes = (0..size)
-            .map(|parent| UnionFindNode { parent, size: 1 })
-            .collect();
-        Self {
-            nodes,
-            num_groups: size,
-        }
-    }
-
-    fn find(&mut self, mut index: usize) -> usize {
-        let mut parent = self.nodes[index].parent;
-        while parent != index {
-            let grand_parent = self.nodes[parent].parent;
-            self.nodes[index].parent = grand_parent;
-            index = grand_parent;
-            parent = self.nodes[index].parent;
-        }
-        index
-    }
-
-    fn union(&mut self, mut index1: usize, mut index2: usize) -> bool {
-        index1 = self.find(index1);
-        index2 = self.find(index2);
-        if index1 == index2 {
-            return false;
-        }
-        if self.nodes[index1].size > self.nodes[index2].size {
-            (index1, index2) = (index2, index1);
-        }
-        self.nodes[index2].parent = index1;
-        self.nodes[index1].size += self.nodes[index2].size;
-        self.num_groups -= 1;
-        true
-    }
-}
+use crate::utils::UnionFind;
 
 #[derive(Debug, Error)]
 enum ParseError {
@@ -94,7 +46,7 @@ fn part_2(input: &[(u16, u16)]) -> usize {
     for &(a, b) in input {
         uf.union(a as usize, b as usize);
     }
-    uf.num_groups
+    uf.num_groups()
 }
 
 #[cfg(test)]
