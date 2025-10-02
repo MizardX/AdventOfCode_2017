@@ -1,3 +1,12 @@
+#![allow(unused, reason = "Library functions might or might not be used depending on each puzzle.")]
+
+use std::collections::VecDeque;
+use std::mem::MaybeUninit;
+use std::ops::{Index, IndexMut};
+use std::str::FromStr;
+
+use thiserror::Error;
+
 #[derive(Debug, Clone)]
 pub struct KnotHasher<const N: usize = 256> {
     lengths: Vec<u8>,
@@ -151,3 +160,90 @@ impl UnionFind {
         self.num_groups
     }
 }
+
+
+#[derive(Debug, Clone)]
+pub struct Grid<T> {
+    data: Vec<T>,
+    rows: usize,
+    cols: usize,
+}
+
+impl<T> Grid<T> {
+    pub fn new(rows: usize, cols: usize) -> Self
+    where
+        T: Default + Copy,
+    {
+        let data = vec![T::default(); rows * cols];
+        Self { data, rows, cols }
+    }
+
+    pub fn find_pos<P>(&self, predicate: P) -> Option<(usize, usize)>
+    where
+        P: FnMut(&T) -> bool,
+    {
+        self.data
+            .iter()
+            .position(predicate)
+            .map(|index| (index / self.cols, index % self.cols))
+    }
+
+    #[must_use]
+    pub const fn rows(&self) -> usize {
+        self.rows
+    }
+
+    #[must_use]
+    pub const fn cols(&self) -> usize {
+        self.cols
+    }
+}
+
+#[derive(Debug, Error)]
+pub enum GridParseError<E> {
+    #[error("Invalid tile")]
+    InvalidTile(#[from] E),
+    #[error("Not all lines where the same length")]
+    ShapeError,
+}
+
+impl<T, E> FromStr for Grid<T>
+where
+    T: TryFrom<u8, Error = E>,
+{
+    type Err = GridParseError<E>;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let cols = s.lines().next().unwrap().len();
+        let rows = s.lines().count();
+        let data = (0..rows * cols)
+            .map(|_| MaybeUninit::uninit())
+            .collect::<Vec<_>>();
+        let mut grid = Grid { data, rows, cols };
+        for (r, line) in s.lines().enumerate() {
+            if line.len() != cols {
+                return Err(GridParseError::ShapeError);
+            }
+            for (c, cell) in line.bytes().enumerate() {
+                let tile: T = cell.try_into()?;
+                grid[(r, c)] = MaybeUninit::new(tile);
+            }
+        }
+        Ok(unsafe { std::mem::transmute::<Grid<MaybeUninit<T>>, Self>(grid) })
+    }
+}
+
+impl<T> Index<(usize, usize)> for Grid<T> {
+    type Output = T;
+
+    fn index(&self, (row, col): (usize, usize)) -> &Self::Output {
+        &self.data[row * self.cols + col]
+    }
+}
+
+impl<T> IndexMut<(usize, usize)> for Grid<T> {
+    fn index_mut(&mut self, (row, col): (usize, usize)) -> &mut Self::Output {
+        &mut self.data[row * self.cols + col]
+    }
+}
+
