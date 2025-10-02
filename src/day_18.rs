@@ -16,15 +16,33 @@ enum ParseError {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct Reg {
-    index: u8,
+#[repr(u8)]
+enum Reg {
+    A,
+    B,
+    C,
+    D,
+    F,
+    I,
+    P,
 }
 
 impl Reg {
-    fn new(ch: u8) -> Result<Self, ParseError> {
-        ch.is_ascii_lowercase()
-            .then_some(Self { index: ch - b'a' })
-            .ok_or(ParseError::InvalidRegister)
+    const fn all() -> [Self; 7] {
+        [Self::A, Self::B, Self::C, Self::D, Self::F, Self::I, Self::P]
+    }
+
+    const fn new(ch: u8) -> Result<Self, ParseError> {
+        Ok(match ch {
+            b'a' => Self::A,
+            b'b' => Self::B,
+            b'c' => Self::C,
+            b'd' => Self::D,
+            b'f' => Self::F,
+            b'i' => Self::I,
+            b'p' => Self::P,
+            _ => return Err(ParseError::InvalidRegister),
+        })
     }
 }
 
@@ -164,7 +182,7 @@ struct Machine<'a> {
     rcv_nonzero: bool,
     state: State,
     ip: usize,
-    registers: [i64; 26],
+    registers: [i64; Reg::all().len()],
     output_queue: VecDeque<i64>,
     output_count: usize,
     input_queue: VecDeque<i64>,
@@ -177,7 +195,7 @@ impl<'a> Machine<'a> {
             rcv_nonzero,
             state: State::Pending,
             ip: 0,
-            registers: [0; 26],
+            registers: [0; Reg::all().len()],
             output_queue: VecDeque::new(),
             output_count: 0,
             input_queue: VecDeque::new(),
@@ -252,13 +270,13 @@ impl Index<Reg> for Machine<'_> {
     type Output = i64;
 
     fn index(&self, reg: Reg) -> &Self::Output {
-        &self.registers[reg.index as usize]
+        &self.registers[reg as usize]
     }
 }
 
 impl IndexMut<Reg> for Machine<'_> {
     fn index_mut(&mut self, reg: Reg) -> &mut Self::Output {
-        &mut self.registers[reg.index as usize]
+        &mut self.registers[reg as usize]
     }
 }
 
